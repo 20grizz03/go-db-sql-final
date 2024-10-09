@@ -33,6 +33,8 @@ func getTestParcel() Parcel {
 func TestAddGetDelete(t *testing.T) {
 	// prepare
 	db, err := sql.Open("sqlite", "tracker.db")
+	require.NoError(t, err, "error not nil")
+	defer db.Close()
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
@@ -41,19 +43,20 @@ func TestAddGetDelete(t *testing.T) {
 	assert.NotNil(t, res, "id not found")
 	// add
 	// добавьте новую посылку в БД, убедитесь в отсутствии ошибки и наличии идентификатора
-	res2, err := store.Get(res)
-	require.Nil(t, err, "error not nil")
-	assert.Equal(t, res2.Status, parcel.Status, "objects do not match")
-	assert.Equal(t, res2.Client, parcel.Client, "objects do not match")
-	assert.Equal(t, res2.Address, parcel.Address, "objects do not match")
-	assert.Equal(t, res2.CreatedAt, parcel.CreatedAt, "objects do not match")
+	id, err := store.Add(parcel)
+	require.NoError(t, err)
+	storeParcel, err := store.Get(id)
+	require.NoError(t, err)
+	parcel.Number = id
+	require.Equal(t, parcel, storeParcel)
 	// get
 	// получите только что добавленную посылку, убедитесь в отсутствии ошибки
 	// проверьте, что значения всех полей в полученном объекте совпадают со значениями полей в переменной parcel
-	err = store.Delete(res)
-	require.Nil(t, err, "error not nil")
-	_, err = store.Get(res)
-	assert.NotNil(t, err, "error not nil")
+	err = store.Delete(id)
+	require.NoError(t, err)
+	_, err = store.Get(id)
+	require.Error(t, err)
+	require.Error(t, err, sql.ErrNoRows)
 	// delete
 	// удалите добавленную посылку, убедитесь в отсутствии ошибки
 	// проверьте, что посылку больше нельзя получить из БД
@@ -63,6 +66,8 @@ func TestAddGetDelete(t *testing.T) {
 func TestSetAddress(t *testing.T) {
 	// prepare
 	db, err := sql.Open("sqlite", "tracker.db")
+	require.NoError(t, err, "error not nil")
+	defer db.Close()
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
@@ -86,6 +91,10 @@ func TestSetAddress(t *testing.T) {
 func TestSetStatus(t *testing.T) {
 	// prepare
 	db, err := sql.Open("sqlite", "tracker.db")
+
+	require.NoError(t, err, "error not nil")
+	defer db.Close()
+
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
@@ -102,14 +111,14 @@ func TestSetStatus(t *testing.T) {
 	// check
 	// получите добавленную посылку и убедитесь, что статус обновился
 	res2, err := store.Get(res)
-	assert.Equal(t, res2.Status, newStatus, "status not match")
+	assert.Equal(t, newStatus, res2.Status, "status not match")
 }
 
 // TestGetByClient проверяет получение посылок по идентификатору клиента
 func TestGetByClient(t *testing.T) {
 	// Подготовка
 	db, err := sql.Open("sqlite", "tracker.db")
-	require.Nil(t, err, "failed to open database")
+	require.NoError(t, err, "error not nil")
 	defer db.Close() // Закрываем базу данных после завершения теста
 
 	store := NewParcelStore(db)
@@ -153,8 +162,6 @@ func TestGetByClient(t *testing.T) {
 		assert.True(t, exists, "parcel not found in map")
 
 		// Проверяем, что поля совпадают
-		assert.Equal(t, expectedParcel.Client, parcel.Client, "client does not match")
-		assert.Equal(t, expectedParcel.Status, parcel.Status, "status does not match")
-		assert.Equal(t, expectedParcel.Address, parcel.Address, "address does not match")
+		assert.Equal(t, expectedParcel, parcel, "client does not match")
 	}
 }
